@@ -6,7 +6,7 @@ metadata:
 spec:
   description: Secured GitOps Project for Dev, QA, and Prod
   sourceRepos:
-  - 'https://github.com/shubhamksawant/lab.git'
+  - 'https://github.com/shubhamksawant/lab2.git'
 
   destinations:
   - namespace: humor-game-dev

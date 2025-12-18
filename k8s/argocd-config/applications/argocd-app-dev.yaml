@@ -1,22 +1,22 @@
 apiVersion: argoproj.io/v1alpha1
 kind: Application
 metadata:
-  name: humor-game-prod # Change to -dev or -qa for others
+  name: humor-game-dev # Change to -dev or -qa for others
   namespace: argocd
 spec:
   project: humor-game-project
   source:
-    repoURL: https://github.com/shubhamksawant/lab.git
+    repoURL: https://github.com/shubhamksawant/lab2.git
     targetRevision: main # develop for dev, qa for qa
-    path: helm-chart
+    path: k8s/helm-chart
     helm:
       valueFiles:
       - values.yaml
-      - values-prod.yaml # Change to values-dev.yaml or values-qa.yaml
+      - values-dev.yaml # Change to values-dev.yaml or values-qa.yaml
 
   destination:
     server: https://kubernetes.default.svc
-    namespace: humor-game-prod # Change to -dev or -qa
+    namespace: humor-game-dev # Change to -dev or -qa
 
   syncPolicy:
     automated:

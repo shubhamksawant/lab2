@@ -6,9 +6,9 @@ metadata:
 spec:
   project: humor-game-project
   source:
-    repoURL: https://github.com/shubhamksawant/lab.git
+    repoURL: https://github.com/shubhamksawant/lab2.git
     targetRevision: main # develop for dev, qa for qa
-    path: helm-chart
+    path: k8s/helm-chart
     helm:
       valueFiles:
       - values.yaml

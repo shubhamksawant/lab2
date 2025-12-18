@@ -10,7 +10,7 @@ backend:
   image:
     repository: humor-game-backend
     tag: latest
-  imagePullPolicy: Never
+  imagePullPolicy: IfNotPresent
   port: 3001
   resources:
     requests:
@@ -39,7 +39,7 @@ frontend:
   image:
     repository: humor-game-frontend
     tag: latest
-  imagePullPolicy: Never
+  imagePullPolicy: IfNotPresent
   port: 80
   resources:
     requests:

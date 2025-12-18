@@ -7,7 +7,7 @@ backend:
   image:
     tag: latest
     repository: humor-game-backend
-  imagePullPolicy: Never
+  imagePullPolicy: IfNotPresent
   replicaCount: 1
   port: 3001
 
@@ -15,7 +15,7 @@ frontend:
   image:
     tag: latest
     repository: humor-game-frontend
-  imagePullPolicy: Never
+  imagePullPolicy: IfNotPresent
   replicaCount: 1
   port: 80
 
