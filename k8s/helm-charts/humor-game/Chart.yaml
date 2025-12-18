@@ -1,0 +1,6 @@
+apiVersion: v2
+name: humor-game-helm-chart
+description: Helm chart converted from kustomize base manifests
+type: application
+version: 0.1.0
+appVersion: "1.0"

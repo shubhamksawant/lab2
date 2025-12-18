@@ -1,0 +1,76 @@
+# Production environment values
+# Override these when deploying to production
+
+namespace: humor-game-prod
+
+backend:
+  image:
+    tag: "170424d"
+    repository: humor-game-backend
+  imagePullPolicy: Always
+  replicaCount: 3
+  port: 3001
+  resources:
+    requests:
+      memory: "512Mi"
+      cpu: "500m"
+    limits:
+      memory: "1Gi"
+      cpu: "2000m"
+
+frontend:
+  image:
+    tag: "170424d"
+    repository: humor-game-frontend
+  imagePullPolicy: Always
+  replicaCount: 3
+  port: 80
+  resources:
+    requests:
+      memory: "256Mi"
+      cpu: "200m"
+    limits:
+      memory: "512Mi"
+      cpu: "1000m"
+
+postgres:
+  image:
+    tag: 15-alpine
+    repository: postgres
+  persistence:
+    enabled: true
+    size: 20Gi
+  resources:
+    requests:
+      memory: "1Gi"
+      cpu: "1000m"
+    limits:
+      memory: "2Gi"
+      cpu: "4000m"
+
+redis:
+  image:
+    tag: 7-alpine
+    repository: redis
+  resources:
+    requests:
+      memory: "512Mi"
+      cpu: "500m"
+    limits:
+      memory: "1Gi"
+      cpu: "2000m"
+
+pvc:
+  storageClassName: "fast-ssd"
+
+configmap:
+  data:
+    NODE_ENV: "production"
+    DB_NAME: "humor_memory_game"
+    DB_USER: "prod_user"
+    REDIS_HOST: "redis"
+    REDIS_PORT: "6379"
+    API_PORT: "3001"
+    CORS_ORIGIN: "https://gameapp.games"
+    FRONTEND_URL: "https://gameapp.games"
+    API_BASE_URL: "https://api.gameapp.games"

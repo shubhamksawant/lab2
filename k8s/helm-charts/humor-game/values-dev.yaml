@@ -1,0 +1,45 @@
+# Development environment values
+# Override these when deploying to dev
+
+namespace: humor-game-dev
+
+backend:
+  image:
+    tag: latest
+    repository: humor-game-backend
+  imagePullPolicy: Never
+  replicaCount: 1
+  port: 3001
+
+frontend:
+  image:
+    tag: latest
+    repository: humor-game-frontend
+  imagePullPolicy: Never
+  replicaCount: 1
+  port: 80
+
+postgres:
+  image:
+    tag: 15-alpine
+    repository: postgres
+  persistence:
+    enabled: true
+    size: 1Gi
+
+redis:
+  image:
+    tag: 7-alpine
+    repository: redis
+
+configmap:
+  data:
+    NODE_ENV: "development"
+    DB_NAME: "humor_memory_game"
+    DB_USER: "gameuser"
+    REDIS_HOST: "redis"
+    REDIS_PORT: "6379"
+    API_PORT: "3001"
+    CORS_ORIGIN: "http://localhost:3000,http://localhost:8080"
+    FRONTEND_URL: "http://localhost:8080"
+    API_BASE_URL: "/api"

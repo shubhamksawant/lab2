@@ -1,0 +1,92 @@
+{{- if .Values.postgres.enabled }}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: postgres-init
+  namespace: {{ .Values.namespace | quote }}
+data:
+  01-init.sql: |
+    -- Humor Memory Game Database Schema
+    -- This file creates the schema and seeds data
+    
+    -- Enable UUID extension for generating unique IDs
+    CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
+    
+    -- Drop tables if they exist (for clean reset)
+    DROP TABLE IF EXISTS game_matches CASCADE;
+    DROP TABLE IF EXISTS games CASCADE;
+    DROP TABLE IF EXISTS users CASCADE;
+    DROP VIEW IF EXISTS leaderboard;
+    
+    -- Create users table
+    CREATE TABLE users (
+        id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+        username VARCHAR(50) UNIQUE NOT NULL,
+        email VARCHAR(100) UNIQUE,
+        display_name VARCHAR(100),
+        created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+        last_played TIMESTAMP WITH TIME ZONE,
+        total_games INTEGER DEFAULT 0,
+        total_score INTEGER DEFAULT 0,
+        best_score INTEGER DEFAULT 0,
+        best_time INTEGER,
+        is_active BOOLEAN DEFAULT true
+    );
+    
+    -- Create games table to track individual game sessions
+    CREATE TABLE games (
+        id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+        user_id UUID REFERENCES users(id) ON DELETE CASCADE,
+        username VARCHAR(50) NOT NULL,
+        score INTEGER NOT NULL DEFAULT 0,
+        moves INTEGER NOT NULL DEFAULT 0,
+        time_elapsed INTEGER NOT NULL DEFAULT 0,
+        cards_matched INTEGER NOT NULL DEFAULT 0,
+        difficulty_level VARCHAR(20) DEFAULT 'easy',
+        game_completed BOOLEAN DEFAULT false,
+        started_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+        completed_at TIMESTAMP WITH TIME ZONE,
+        game_data JSONB
+    );
+    
+    -- Create game_matches table to track individual card matches
+    CREATE TABLE game_matches (
+        id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+        game_id UUID REFERENCES games(id) ON DELETE CASCADE,
+        card1_id VARCHAR(50) NOT NULL,
+        card2_id VARCHAR(50) NOT NULL,
+        match_time INTEGER NOT NULL,
+        points_earned INTEGER DEFAULT 10,
+        bonus_points INTEGER DEFAULT 0,
+        created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+    );
+    
+    -- Create leaderboard view for easy querying
+    CREATE OR REPLACE VIEW leaderboard AS
+    SELECT 
+        u.username,
+        u.display_name,
+        u.total_games,
+        u.total_score,
+        u.best_score,
+        u.best_time,
+        u.last_played,
+        CASE 
+            WHEN u.total_games > 0 THEN ROUND(u.total_score::decimal / u.total_games, 2)
+            ELSE 0 
+        END as avg_score,
+        ROW_NUMBER() OVER (ORDER BY u.best_score DESC, u.best_time ASC) as rank
+    FROM users u
+    WHERE u.is_active = true AND u.total_games > 0
+    ORDER BY u.best_score DESC, u.best_time ASC;
+    
+    -- Create indexes for better performance
+    CREATE INDEX IF NOT EXISTS idx_users_username ON users(username);
+    CREATE INDEX IF NOT EXISTS idx_users_best_score ON users(best_score DESC);
+    CREATE INDEX IF NOT EXISTS idx_users_last_played ON users(last_played);
+    CREATE INDEX IF NOT EXISTS idx_games_user_id ON games(user_id);
+    CREATE INDEX IF NOT EXISTS idx_games_score ON games(score DESC);
+    CREATE INDEX IF NOT EXISTS idx_games_completed_at ON games(completed_at);
+    CREATE INDEX IF NOT EXISTS idx_game_matches_game_id ON game_matches(game_id);
+{{- end }}

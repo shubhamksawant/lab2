@@ -1,0 +1,46 @@
+apiVersion: argoproj.io/v1alpha1
+kind: AppProject
+metadata:
+  name: humor-game-project
+  namespace: argocd
+spec:
+  description: Secured GitOps Project for Dev, QA, and Prod
+  sourceRepos:
+  - 'https://github.com/shubhamksawant/lab.git'
+
+  destinations:
+  - namespace: humor-game-dev
+    server: https://kubernetes.default.svc
+  - namespace: humor-game-qa
+    server: https://kubernetes.default.svc
+  - namespace: humor-game-prod
+    server: https://kubernetes.default.svc
+  # Cluster resource allow list
+  clusterResourceWhitelist:
+  - group: ''
+    kind: Namespace
+  - group: 'networking.k8s.io'
+    kind: Ingress
+  # Namespace resource allow list (Restrictive)
+  namespaceResourceWhitelist:
+  - group: ''
+    kind: ConfigMap
+  - group: 'apps'
+    kind: Deployment
+  - group: ''
+    kind: Service
+  - group: ''
+    kind: PersistentVolumeClaim
+  - group: ''
+    kind: Secret # Added: usually needed for Helm/App secrets
+  # Resource deny list (The "Blacklist")
+  clusterResourceBlacklist:
+  - group: 'rbac.authorization.k8s.io'
+    kind: ClusterRole
+  - group: 'rbac.authorization.k8s.io'
+    kind: ClusterRoleBinding
+
+  orphanedResources:
+    warn: true
+
+  signatureKeys: []

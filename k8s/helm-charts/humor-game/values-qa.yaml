@@ -1,0 +1,73 @@
+# QA environment values
+# Override these when deploying to QA
+
+namespace: humor-game-qa
+
+backend:
+  image:
+    tag: qa-latest
+    repository: humor-game-backend
+  imagePullPolicy: Always
+  replicaCount: 2
+  port: 3001
+  resources:
+    requests:
+      memory: "256Mi"
+      cpu: "200m"
+    limits:
+      memory: "512Mi"
+      cpu: "1000m"
+
+frontend:
+  image:
+    tag: qa-latest
+    repository: humor-game-frontend
+  imagePullPolicy: Always
+  replicaCount: 2
+  port: 80
+  resources:
+    requests:
+      memory: "128Mi"
+      cpu: "100m"
+    limits:
+      memory: "256Mi"
+      cpu: "500m"
+
+postgres:
+  image:
+    tag: 15-alpine
+    repository: postgres
+  persistence:
+    enabled: true
+    size: 5Gi
+  resources:
+    requests:
+      memory: "512Mi"
+      cpu: "500m"
+    limits:
+      memory: "1Gi"
+      cpu: "2000m"
+
+redis:
+  image:
+    tag: 7-alpine
+    repository: redis
+  resources:
+    requests:
+      memory: "128Mi"
+      cpu: "200m"
+    limits:
+      memory: "256Mi"
+      cpu: "1000m"
+
+configmap:
+  data:
+    NODE_ENV: "qa"
+    DB_NAME: "humor_memory_game_qa"
+    DB_USER: "qa_user"
+    REDIS_HOST: "redis"
+    REDIS_PORT: "6379"
+    API_PORT: "3001"
+    CORS_ORIGIN: "https://qa.gameapp.games"
+    FRONTEND_URL: "https://qa.gameapp.games"
+    API_BASE_URL: "https://qa-api.gameapp.games"

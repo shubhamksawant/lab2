@@ -1,0 +1,47 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: humor-game-prod # Change to -dev or -qa for others
+  namespace: argocd
+spec:
+  project: humor-game-project
+  source:
+    repoURL: https://github.com/shubhamksawant/lab.git
+    targetRevision: main # develop for dev, qa for qa
+    path: helm-chart
+    helm:
+      valueFiles:
+      - values.yaml
+      - values-prod.yaml # Change to values-dev.yaml or values-qa.yaml
+
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: humor-game-prod # Change to -dev or -qa
+
+  syncPolicy:
+    automated:
+      prune: false # Safety first: don't auto-delete
+      selfHeal: true
+    syncOptions:
+    - CreateNamespace=true
+    - ApplyOutOfSyncOnly=true
+    - PrunePropagationPolicy=foreground # Added for safe deletion
+    - Prune=false
+
+  # Added back: Critical for avoiding "False Positive" Out-of-Sync status
+  ignoreDifferences:
+  - group: apps
+    kind: Deployment
+    jsonPointers:
+    - /spec/template/metadata/annotations/deployment.kubernetes.io~1revision
+  - group: ''
+    kind: Service
+    jsonPointers:
+    - /spec/clusterIP
+    - /spec/clusterIPs
+  - group: autoscaling
+    kind: HorizontalPodAutoscaler
+    jsonPointers:
+    - /status
+
+  revisionHistoryLimit: 10 # Added back: keeps cluster clean

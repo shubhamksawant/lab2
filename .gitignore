@@ -1,0 +1,13 @@
+# Local environment variables
+.env
+*.local
+
+# Build artifacts
+node_modules/
+__pycache__/
+target/
+
+# Terraform
+.terraform/
+*.tfstate
+*.tfstate.backup

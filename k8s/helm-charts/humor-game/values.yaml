@@ -1,0 +1,116 @@
+# Default values for gitops-safe-copy.
+# Extracted from kustomize base manifests
+
+namespace: humor-game
+
+backend:
+  enabled: true
+  name: backend
+  replicaCount: 1
+  image:
+    repository: humor-game-backend
+    tag: latest
+  imagePullPolicy: Never
+  port: 3001
+  resources:
+    requests:
+      memory: "128Mi"
+      cpu: "100m"
+    limits:
+      memory: "256Mi"
+      cpu: "500m"
+  livenessProbe:
+    enabled: true
+    path: /health
+    initialDelaySeconds: 30
+    periodSeconds: 10
+  readinessProbe:
+    enabled: true
+    path: /health
+  annotations:
+    prometheus.io/scrape: "true"
+    prometheus.io/port: "3001"
+    prometheus.io/path: "/metrics"
+
+frontend:
+  enabled: true
+  name: frontend
+  replicaCount: 1
+  image:
+    repository: humor-game-frontend
+    tag: latest
+  imagePullPolicy: Never
+  port: 80
+  resources:
+    requests:
+      memory: "64Mi"
+      cpu: "50m"
+    limits:
+      memory: "128Mi"
+      cpu: "200m"
+  annotations:
+    prometheus.io/scrape: "true"
+    prometheus.io/port: "80"
+    prometheus.io/path: "/metrics"
+
+postgres:
+  enabled: true
+  name: postgres
+  image:
+    repository: postgres
+    tag: 15-alpine
+  imagePullPolicy: Always
+  port: 5432
+  persistence:
+    enabled: true
+    size: 1Gi
+  resources:
+    requests:
+      memory: "256Mi"
+      cpu: "250m"
+    limits:
+      memory: "512Mi"
+      cpu: "1000m"
+
+redis:
+  enabled: true
+  name: redis
+  image:
+    repository: redis
+    tag: 7-alpine
+  imagePullPolicy: Always
+  port: 6379
+  resources:
+    requests:
+      memory: "64Mi"
+      cpu: "100m"
+    limits:
+      memory: "128Mi"
+      cpu: "500m"
+
+configmap:
+  enabled: true
+  name: humor-game-config
+  data:
+    NODE_ENV: "development"
+    DB_NAME: "humor_memory_game"
+    DB_USER: "gameuser"
+    REDIS_HOST: "redis"
+    REDIS_PORT: "6379"
+    API_PORT: "3001"
+    CORS_ORIGIN: "http://localhost:3000,http://localhost:8080,https://gameapp.games"
+    FRONTEND_URL: "http://localhost:8080"
+    API_BASE_URL: "/api"
+
+secrets:
+  enabled: true
+  name: humor-game-secrets
+  data:
+    DB_PASSWORD: "gamepass123"
+    REDIS_PASSWORD: "gamepass123"
+    JWT_SECRET: "supersecretjwttokensecret"
+
+pvc:
+  storageClassName: ""
+
+labels: {}
