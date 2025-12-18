@@ -15,12 +15,18 @@ spec:
     server: https://kubernetes.default.svc
   - namespace: humor-game-prod
     server: https://kubernetes.default.svc
+  - namespace: monitoring  # <--- ADD THIS LINE
+    server: https://kubernetes.default.svc
   # Cluster resource allow list
   clusterResourceWhitelist:
   - group: ''
     kind: Namespace
   - group: 'networking.k8s.io'
     kind: Ingress
+  - group: 'rbac.authorization.k8s.io'
+    kind: ClusterRole
+  - group: 'rbac.authorization.k8s.io'
+    kind: ClusterRoleBinding
   # Namespace resource allow list (Restrictive)
   namespaceResourceWhitelist:
   - group: ''
@@ -35,10 +41,7 @@ spec:
     kind: Secret # Added: usually needed for Helm/App secrets
   # Resource deny list (The "Blacklist")
   clusterResourceBlacklist:
-  - group: 'rbac.authorization.k8s.io'
-    kind: ClusterRole
-  - group: 'rbac.authorization.k8s.io'
-    kind: ClusterRoleBinding
+
 
   orphanedResources:
     warn: true
