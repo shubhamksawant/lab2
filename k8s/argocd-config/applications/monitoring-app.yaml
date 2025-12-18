@@ -11,7 +11,8 @@ spec:
     path: k8s/monitoring # Points to your folder with monitoring.yaml, rbac, etc.
     directory:
       recurse: true # Ensures it picks up the JSON dashboard files if they are referenced
-  
+      # 👇 THIS IS THE FIX: Tell ArgoCD NOT to try and "apply" the JSON files
+      exclude: '*.json'
   destination:
     server: https://kubernetes.default.svc
     namespace: monitoring # Matches the namespace in your monitoring.yaml

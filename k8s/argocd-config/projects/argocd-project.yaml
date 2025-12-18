@@ -27,6 +27,8 @@ spec:
     kind: ClusterRole
   - group: 'rbac.authorization.k8s.io'
     kind: ClusterRoleBinding
+  - group: 'apiextensions.k8s.io'
+    kind: CustomResourceDefinition
   # Namespace resource allow list (Restrictive)
   namespaceResourceWhitelist:
   - group: ''
@@ -39,6 +41,15 @@ spec:
     kind: PersistentVolumeClaim
   - group: ''
     kind: Secret # Added: usually needed for Helm/App secrets
+  - group: ''
+    kind: ServiceAccount      # Needed for Prometheus Identity
+  - group: ''
+    kind: PersistentVolumeClaim # Needed for Database/Metrics storage
+  - group: 'monitoring.coreos.com'
+    kind: ServiceMonitor      # Needed for your Custom Metrics scraping
+  - group: '*'
+    kind: '*'
+  
   # Resource deny list (The "Blacklist")
   clusterResourceBlacklist:
 

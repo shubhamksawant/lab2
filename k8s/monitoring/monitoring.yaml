@@ -21,13 +21,13 @@ data:
       # Static targets for humor-game services
       - job_name: 'humor-game-backend'
         static_configs:
-          - targets: ['backend.humor-game.svc.cluster.local:3001']
+          - targets: ['backend.humor-game-dev.svc.cluster.local:3001']
         metrics_path: '/metrics'
         scrape_interval: 15s
       
       - job_name: 'humor-game-frontend'
         static_configs:
-          - targets: ['frontend.humor-game.svc.cluster.local:80']
+          - targets: ['frontend.humor-game-dev.svc.cluster.local:80']
         metrics_path: '/metrics'
         scrape_interval: 15s
       
@@ -640,6 +640,11 @@ metadata:
   name: humor-game-backend
   namespace: monitoring
 spec:
+  namespaceSelector:
+    matchNames:
+      - humor-game-dev
+      - humor-game-qa
+      - humor-game-prod
   selector:
     matchLabels:
       app: backend
