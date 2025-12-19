@@ -633,36 +633,36 @@ data:
         }
       }
     }
----
-apiVersion: monitoring.coreos.com/v1
-kind: ServiceMonitor
-metadata:
-  name: humor-game-backend
-  namespace: monitoring
-spec:
-  namespaceSelector:
-    matchNames:
-      - humor-game-dev
-      - humor-game-qa
-      - humor-game-prod
-  selector:
-    matchLabels:
-      app: backend
-  endpoints:
-    - port: "3001"
-      path: /metrics
-      interval: 15s
----
-apiVersion: monitoring.coreos.com/v1
-kind: ServiceMonitor
-metadata:
-  name: humor-game-frontend
-  namespace: monitoring
-spec:
-  selector:
-    matchLabels:
-      app: frontend
-  endpoints:
-    - port: "80"
-      path: /metrics
-      interval: 15s
+# ---
+# apiVersion: monitoring.coreos.com/v1
+# kind: ServiceMonitor
+# metadata:
+#   name: humor-game-backend
+#   namespace: monitoring
+# spec:
+#   namespaceSelector:
+#     matchNames:
+#       - humor-game-dev
+#       - humor-game-qa
+#       - humor-game-prod
+#   selector:
+#     matchLabels:
+#       app: backend
+#   endpoints:
+#     - port: "3001"
+#       path: /metrics
+#       interval: 15s
+# ---
+# apiVersion: monitoring.coreos.com/v1
+# kind: ServiceMonitor
+# metadata:
+#   name: humor-game-frontend
+#   namespace: monitoring
+# spec:
+#   selector:
+#     matchLabels:
+#       app: frontend
+#   endpoints:
+#     - port: "80"
+#       path: /metrics
+#       interval: 15s
