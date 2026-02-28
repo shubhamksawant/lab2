@@ -34,6 +34,11 @@ spec:
     kind: Deployment
     jsonPointers:
     - /spec/template/metadata/annotations/deployment.kubernetes.io~1revision
+  - group: argoproj.io
+    kind: Rollout
+    jsonPointers:
+    - /spec/template/metadata/annotations/deployment.kubernetes.io~1revision
+    - /status
   - group: ''
     kind: Service
     jsonPointers:

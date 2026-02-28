@@ -1,0 +1,83 @@
+{{- if .Values.backend.canary.analysis.enabled }}
+apiVersion: argoproj.io/v1alpha1
+kind: AnalysisTemplate
+metadata:
+  name: backend-analysis
+  namespace: {{ .Values.namespace | quote }}
+  labels:
+    app: {{ .Values.backend.name }}
+spec:
+  metrics:
+  # Error rate metric (percentage of failed requests)
+  - name: backend-error-rate
+    interval: {{ .Values.backend.canary.analysis.interval }}
+    count: {{ .Values.backend.canary.analysis.threshold }}
+    failureLimit: 3
+    provider:
+      prometheus:
+        address: http://prometheus:9090
+        query: |
+          sum(rate(http_requests_total{job="backend",status=~"5.."}[5m])) /
+          sum(rate(http_requests_total{job="backend"}[5m])) * 100
+        successCriteria: "{{ index .Values.backend.canary.analysis.metrics 0 \"threshold\" }} > {{ . }}"
+
+  # Latency metric (p95 in milliseconds)
+  {{- if gt (len .Values.backend.canary.analysis.metrics) 1 }}
+  - name: backend-latency-p95
+    interval: {{ .Values.backend.canary.analysis.interval }}
+    count: {{ .Values.backend.canary.analysis.threshold }}
+    failureLimit: 2
+    provider:
+      prometheus:
+        address: http://prometheus:9090
+        query: |
+          histogram_quantile(0.95, 
+            sum(rate(http_request_duration_seconds_bucket{job="backend"}[5m])) by (le)
+          ) * 1000
+        successCriteria: "{{ index .Values.backend.canary.analysis.metrics 1 \"threshold\" }} > {{ . }}"
+  {{- end }}
+
+  # Request count metric
+  - name: backend-request-count
+    interval: {{ .Values.backend.canary.analysis.interval }}
+    count: 1
+    provider:
+      prometheus:
+        address: http://prometheus:9090
+        query: |
+          sum(rate(http_requests_total{job="backend"}[5m]))
+---
+{{- end }}
+{{- if .Values.frontend.canary.analysis.enabled }}
+apiVersion: argoproj.io/v1alpha1
+kind: AnalysisTemplate
+metadata:
+  name: frontend-analysis
+  namespace: {{ .Values.namespace | quote }}
+  labels:
+    app: {{ .Values.frontend.name }}
+spec:
+  metrics:
+  # Error rate metric (percentage of failed requests)
+  - name: frontend-error-rate
+    interval: {{ .Values.frontend.canary.analysis.interval }}
+    count: {{ .Values.frontend.canary.analysis.threshold }}
+    failureLimit: 3
+    provider:
+      prometheus:
+        address: http://prometheus:9090
+        query: |
+          sum(rate(http_requests_total{job="frontend",status=~"5.."}[5m])) /
+          sum(rate(http_requests_total{job="frontend"}[5m])) * 100
+        successCriteria: "{{ index .Values.frontend.canary.analysis.metrics 0 \"threshold\" }} > {{ . }}"
+
+  # Request count metric
+  - name: frontend-request-count
+    interval: {{ .Values.frontend.canary.analysis.interval }}
+    count: 1
+    provider:
+      prometheus:
+        address: http://prometheus:9090
+        query: |
+          sum(rate(http_requests_total{job="frontend"}[5m]))
+{{- end }}

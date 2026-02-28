@@ -1,0 +1,67 @@
+{{- if .Values.backend.canary.enabled }}
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ .Values.backend.name }}-canary
+  namespace: {{ .Values.namespace | quote }}
+  labels:
+    app: {{ .Values.backend.name }}
+spec:
+  ports:
+  - port: {{ .Values.backend.port }}
+    targetPort: http
+    protocol: TCP
+    name: http
+  selector:
+    app: {{ .Values.backend.name }}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ .Values.backend.name }}-stable
+  namespace: {{ .Values.namespace | quote }}
+  labels:
+    app: {{ .Values.backend.name }}
+spec:
+  ports:
+  - port: {{ .Values.backend.port }}
+    targetPort: http
+    protocol: TCP
+    name: http
+  selector:
+    app: {{ .Values.backend.name }}
+---
+{{- end }}
+{{- if .Values.frontend.canary.enabled }}
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ .Values.frontend.name }}-canary
+  namespace: {{ .Values.namespace | quote }}
+  labels:
+    app: {{ .Values.frontend.name }}
+spec:
+  ports:
+  - port: {{ .Values.frontend.port }}
+    targetPort: http
+    protocol: TCP
+    name: http
+  selector:
+    app: {{ .Values.frontend.name }}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ .Values.frontend.name }}-stable
+  namespace: {{ .Values.namespace | quote }}
+  labels:
+    app: {{ .Values.frontend.name }}
+spec:
+  ports:
+  - port: {{ .Values.frontend.port }}
+    targetPort: http
+    protocol: TCP
+    name: http
+  selector:
+    app: {{ .Values.frontend.name }}
+{{- end }}

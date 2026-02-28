@@ -1,0 +1,38 @@
+Terraform Validation Report - Sat Feb 28 15:54:16 IST 2026
+===========================================
+Environment: terraform/ec2/dev
+Result: SUCCESS
+-------------------------------------------
+Environment: terraform/ec2/qa
+Result: SUCCESS
+-------------------------------------------
+Environment: terraform/ec2/prod
+Result: SUCCESS
+-------------------------------------------
+Environment: terraform/ecs/dev
+Result: SUCCESS
+-------------------------------------------
+Environment: terraform/ecs/qa
+Result: SUCCESS
+-------------------------------------------
+Environment: terraform/ecs/prod
+Result: SUCCESS
+-------------------------------------------
+Environment: terraform/eks/dev
+Result: SUCCESS
+-------------------------------------------
+Environment: terraform/eks/qa
+Result: SUCCESS
+-------------------------------------------
+Environment: terraform/eks/prod
+Result: SUCCESS
+-------------------------------------------
+Environment: terraform/vpc/dev
+Result: SUCCESS
+-------------------------------------------
+Environment: terraform/vpc/qa
+Result: SUCCESS
+-------------------------------------------
+Environment: terraform/vpc/prod
+Result: SUCCESS
+-------------------------------------------

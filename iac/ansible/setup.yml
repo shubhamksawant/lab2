@@ -1,0 +1,115 @@
+---
+- name: Enterprise EC2 Setup (AWS CLI, SSM, Docker, kubectl)
+  hosts: all
+  become: yes
+  gather_facts: yes
+  vars:
+    kubectl_version: "v1.29.0"
+
+  tasks:
+    - name: Ensure connection is ready before proceeding
+      wait_for_connection:
+        delay: 5
+        timeout: 300
+
+    - name: Update package cache (Debian/Ubuntu)
+      apt:
+        update_cache: yes
+      when: ansible_os_family == "Debian"
+
+    - name: Update package cache (RHEL/CentOS/Amazon)
+      yum:
+        update_cache: yes
+      when: ansible_os_family == "RedHat"
+
+    - name: Install core system utilities
+      package:
+        name:
+          - unzip
+          - jq
+          - curl
+          - wget
+          - chrony
+          - htop
+        state: present
+
+    - name: Ensure time synchronization (chronyd) is running
+      systemd:
+        name: chronyd
+        state: started
+        enabled: yes
+
+    - name: Install AWS CLI (v2)
+      unarchive:
+        src: "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip"
+        dest: /tmp
+        remote_src: yes
+      register: aws_cli_download
+
+    - name: Run AWS CLI install script
+      command: /tmp/aws/install --update
+      when: aws_cli_download.changed
+
+    - name: Verify AWS CLI installation
+      command: aws --version
+      register: aws_cli_version
+      changed_when: false
+
+    - name: Check / Install SSM Agent (Amazon Linux / RHEL / CentOS)
+      yum:
+        name: "https://s3.amazonaws.com/ec2-downloads-windows/SSMAgent/latest/linux_amd64/amazon-ssm-agent.rpm"
+        state: present
+      when: ansible_os_family == "RedHat"
+      ignore_errors: true
+
+    - name: Install SSM Agent (Debian/Ubuntu)
+      get_url:
+        url: "https://s3.amazonaws.com/ec2-downloads-windows/SSMAgent/latest/debian_amd64/amazon-ssm-agent.deb"
+        dest: /tmp/amazon-ssm-agent.deb
+      when: ansible_os_family == "Debian"
+
+    - name: Apply SSM Agent DEB (Debian/Ubuntu)
+      apt:
+        deb: /tmp/amazon-ssm-agent.deb
+      when: ansible_os_family == "Debian"
+
+    - name: Ensure SSM Agent is running
+      systemd:
+        name: amazon-ssm-agent
+        state: started
+        enabled: yes
+
+    - name: Download kubectl binary
+      get_url:
+        url: "https://dl.k8s.io/release/{{ kubectl_version }}/bin/linux/amd64/kubectl"
+        dest: /usr/local/bin/kubectl
+        mode: '0755'
+
+    - name: Verify kubectl installation
+      command: kubectl version --client
+      register: kubectl_cmd_version
+      changed_when: false
+
+    - name: Install Docker System
+      package:
+        name: docker
+        state: present
+      when: ansible_os_family == "RedHat"
+
+    - name: Install Docker System (Debian/Ubuntu)
+      apt:
+        name: docker.io
+        state: present
+      when: ansible_os_family == "Debian"
+
+    - name: Ensure Docker is enabled and running
+      systemd:
+        name: docker
+        state: started
+        enabled: yes
+
+    - name: Display component versions
+      debug:
+        msg: 
+          - "AWS CLI: {{ aws_cli_version.stdout }}"
+          - "Kubectl: {{ kubectl_cmd_version.stdout }}"
