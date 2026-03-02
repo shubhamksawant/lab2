@@ -4,7 +4,7 @@ on:
   push:
     branches: [main, develop, qa]
     paths:
-      - 'terraform-infra/**' # Triggers only when IaC code changes
+      - 'terraform/**' # Triggers only when IaC code changes
   workflow_dispatch:
     inputs:
       terraform:
