@@ -1,0 +1,66 @@
+# Canary-specific values override
+# Use: helm install -f values.yaml -f values-canary.yaml
+
+namespace: humor-game-canary
+
+backend:
+  rolloutEnabled: true  # Enable Rollouts instead of Deployment
+  canary:
+    enabled: true
+    steps:
+    - weight: 10
+      duration: 5m
+    - weight: 25
+      duration: 5m
+    - weight: 50
+      duration: 5m
+    - weight: 100
+      duration: 2m
+    analysis:
+      enabled: true
+      interval: 1m
+      threshold: 3
+      metrics:
+      - name: error-rate
+        threshold: 2
+      - name: latency-p95
+        threshold: 1000
+
+frontend:
+  rolloutEnabled: true  # Enable Rollouts instead of Deployment
+  canary:
+    enabled: true
+    steps:
+    - weight: 10
+      duration: 5m
+    - weight: 25
+      duration: 5m
+    - weight: 50
+      duration: 5m
+    - weight: 100
+      duration: 2m
+    analysis:
+      enabled: true
+      interval: 1m
+      threshold: 3
+      metrics:
+      - name: error-rate
+        threshold: 2
+
+# Enable Argo Rollouts controller in cluster
+argoRollouts:
+  enabled: true
+  replicas: 1
+  dashboard:
+    enabled: true
+    service:
+      type: ClusterIP
+      port: 3100
+
+# Monitoring configuration
+monitoring:
+  enabled: true
+  prometheus:
+    enabled: true
+    interval: 30s
+    retention: 15d

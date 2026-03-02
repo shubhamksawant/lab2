@@ -1,0 +1,83 @@
+{{- if .Values.frontend.rolloutEnabled }}
+apiVersion: argoproj.io/v1alpha1
+kind: Rollout
+metadata:
+  name: {{ .Values.frontend.name }}
+  namespace: {{ .Values.namespace | quote }}
+  labels:
+    app: {{ .Values.frontend.name }}
+spec:
+  replicas: {{ .Values.frontend.replicaCount }}
+  selector:
+    matchLabels:
+      app: {{ .Values.frontend.name }}
+  template:
+    metadata:
+      labels:
+        app: {{ .Values.frontend.name }}
+        version: {{ .Values.frontend.image.tag | quote }}
+      {{- if .Values.frontend.annotations }}
+      annotations:
+{{ toYaml .Values.frontend.annotations | indent 8 }}
+      {{- end }}
+    spec:
+      containers:
+        - name: {{ .Values.frontend.name }}
+          image: "{{ .Values.frontend.image.repository }}:{{ .Values.frontend.image.tag }}"
+          imagePullPolicy: {{ .Values.frontend.imagePullPolicy }}
+          ports:
+            - containerPort: {{ .Values.frontend.port }}
+              name: http
+          env:
+            - name: API_BASE_URL
+              valueFrom:
+                configMapKeyRef:
+                  name: {{ .Values.configmap.name }}
+                  key: API_BASE_URL
+            - name: NODE_ENV
+              valueFrom:
+                configMapKeyRef:
+                  name: {{ .Values.configmap.name }}
+                  key: NODE_ENV
+          resources: {{ toYaml .Values.frontend.resources | nindent 12 }}
+          readinessProbe:
+            httpGet:
+              path: /
+              port: http
+            initialDelaySeconds: 5
+            periodSeconds: 5
+
+  {{- if .Values.frontend.canary.enabled }}
+  strategy:
+    canary:
+      # Initial traffic weight for canary
+      canaryService: {{ .Values.frontend.name }}-canary
+      stableService: {{ .Values.frontend.name }}-stable
+      
+      # Canary steps with progressive traffic increase
+      steps:
+      {{- range .Values.frontend.canary.steps }}
+      - weight: {{ .weight }}
+        duration: {{ .duration }}
+      {{- end }}
+      
+      # Traffic management (no special routing, default round-robin)
+      # For advanced traffic splitting, use VirtualService with Istio
+      
+      # Optional: pause between steps
+      pauseDuration: 5m
+
+  {{- if .Values.frontend.canary.analysis.enabled }}
+      # Analysis configuration for each step
+      analysis:
+        templates:
+        - name: frontend-analysis
+        startingStep: 1  # Start analysis from step 1 (after initial weight)
+        interval: {{ .Values.frontend.canary.analysis.interval }}
+        threshold: {{ .Values.frontend.canary.analysis.threshold }}
+        successCriteria:
+        - metricName: frontend-error-rate
+          successCriteria: "< {{ index .Values.frontend.canary.analysis.metrics 0 \"threshold\" }}"
+  {{- end }}
+  {{- end }}
+{{- end }}

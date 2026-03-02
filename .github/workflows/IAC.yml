@@ -1,0 +1,135 @@
+name: 'Terraform and Security Scanning'
+
+on:
+  push:
+    branches: [main, develop, qa]
+    paths:
+      - 'terraform/**' # Triggers only when IaC code changes
+  workflow_dispatch:
+    inputs:
+      terraform:
+        description: 'Run Terraform Apply (yes/no)'
+        required: true
+        default: 'no'
+
+permissions:
+  id-token: write
+  contents: read 
+
+env: 
+  AWS_REGION: ap-south-1
+  TF_VERSION: 1.5.7
+
+jobs:
+  ###################################################
+  # JOB 1: AUDIT & PLAN (Always Runs on Push)
+  ###################################################
+  infrastructure-audit:
+    name: 🛡️ Audit & Plan
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: terraform-infra
+    
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Configure AWS Credentials (OIDC)
+        uses: aws-actions/configure-aws-credentials@v3
+        with:
+          aws-region: ${{ env.AWS_REGION }}
+          role-to-assume: arn:aws:iam:::role/aws-deployment-tf
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: ${{ env.TF_VERSION }}
+
+      - name: Run Security Scans (tfsec & Checkov)
+        run: |
+          pip install checkov
+          checkov -d . --framework terraform
+        continue-on-error: true
+
+      - name: Terraform Init & Plan
+        id: plan
+        run: |
+          terraform init
+          # Dynamically select tfvars based on branch
+          if [[ "${{ github.ref_name }}" == "main" ]]; then
+            TF_VARS="prod.terraform.tfvars"
+          elif [[ "${{ github.ref_name }}" == "qa" ]]; then
+            TF_VARS="qa.terraform.tfvars"
+          else
+            TF_VARS="dev.terraform.tfvars"
+          fi
+          terraform plan -no-color -var-file=$TF_VARS
+      
+      - name: 📢 Slack - Plan Notification
+        if: always()
+        uses: 8398a7/action-slack@v3
+        with:
+          status: custom
+          fields: workflow,repo,commit
+          custom_payload: |
+            {
+              "attachments": [{
+                "color": "#36a64f",
+                "title": "📝 Terraform Plan - ${{ github.ref_name }}",
+                "text": "Security scan & Plan complete for environment: *${{ github.ref_name }}*.\n\n*Review needed for Apply.*",
+                "actions": [{
+                  "type": "button",
+                  "text": "Review in GitHub",
+                  "url": "${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+                }]
+              }]
+            }
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+
+  ###################################################
+  # JOB 2: APPLY (Approval Gate)
+  ###################################################
+  terraform-apply:
+    name: 🚀 Terraform Apply
+    needs: infrastructure-audit
+    # Only runs on main branch push or manual trigger
+    if: github.ref == 'refs/heads/main' || github.event.inputs.terraform == 'yes'
+    runs-on: ubuntu-latest
+    # Map branch to specific GitHub Environment for Approval Gates
+    environment: ${{ (github.ref_name == 'main' && 'production') || (github.ref_name == 'qa' && 'qa') || 'development' }}
+    defaults:
+      run:
+        working-directory: terraform-infra
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v3
+        with:
+          aws-region: ${{ env.AWS_REGION }}
+          role-to-assume: arn:aws:iam::434605749312:role/aws-deployment-tf
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: ${{ env.TF_VERSION }}
+
+      - name: Terraform Init & Apply
+        run: |
+          terraform init
+          # Determine vars file
+          [[ "${{ github.ref_name }}" == "main" ]] && VARS="prod.terraform.tfvars" || VARS="dev.terraform.tfvars"
+          terraform apply --auto-approve -var-file=$VARS
+
+      - name: 📢 Slack - Status
+        if: always()
+        uses: 8398a7/action-slack@v3
+        with:
+          status: ${{ job.status }}
+          text: "Infrastructure Deployment on *${{ github.ref_name }}* ended with status: ${{ job.status }}"
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}

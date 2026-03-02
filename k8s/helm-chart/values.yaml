@@ -12,6 +12,21 @@ backend:
     tag: latest
   imagePullPolicy: IfNotPresent
   port: 3001
+  rolloutEnabled: false  # Set to true for canary deployments
+  canary:
+    enabled: false
+    steps:
+    - weight: 10
+      duration: 5m
+    - weight: 50
+      duration: 5m
+    analysis:
+      enabled: false
+      interval: 1m
+      threshold: 5
+      metrics:
+      - name: error-rate
+        threshold: 1
   resources:
     requests:
       memory: "128Mi"
@@ -41,6 +56,21 @@ frontend:
     tag: latest
   imagePullPolicy: IfNotPresent
   port: 80
+  rolloutEnabled: false  # Set to true for canary deployments
+  canary:
+    enabled: false
+    steps:
+    - weight: 10
+      duration: 5m
+    - weight: 50
+      duration: 5m
+    analysis:
+      enabled: false
+      interval: 1m
+      threshold: 5
+      metrics:
+      - name: error-rate
+        threshold: 1
   resources:
     requests:
       memory: "64Mi"

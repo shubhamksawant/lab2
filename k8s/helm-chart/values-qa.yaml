@@ -10,6 +10,23 @@ backend:
   imagePullPolicy: IfNotPresent
   replicaCount: 2
   port: 3001
+  rolloutEnabled: true  # Enable canary for qa
+  canary:
+    enabled: true
+    steps:
+    - weight: 20
+      duration: 5m
+    - weight: 50
+      duration: 5m
+    - weight: 100
+      duration: 2m
+    analysis:
+      enabled: true
+      interval: 1m
+      threshold: 3
+      metrics:
+      - name: error-rate
+        threshold: 2
   resources:
     requests:
       memory: "256Mi"
@@ -25,6 +42,23 @@ frontend:
   imagePullPolicy: IfNotPresent
   replicaCount: 2
   port: 80
+  rolloutEnabled: true  # Enable canary for qa
+  canary:
+    enabled: true
+    steps:
+    - weight: 20
+      duration: 5m
+    - weight: 50
+      duration: 5m
+    - weight: 100
+      duration: 2m
+    analysis:
+      enabled: true
+      interval: 1m
+      threshold: 3
+      metrics:
+      - name: error-rate
+        threshold: 2
   resources:
     requests:
       memory: "128Mi"

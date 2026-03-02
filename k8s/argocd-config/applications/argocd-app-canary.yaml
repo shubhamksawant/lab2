@@ -1,0 +1,67 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: humor-game-canary
+  namespace: argocd
+  labels:
+    env: canary
+spec:
+  project: humor-game-project
+  
+  source:
+    repoURL: https://github.com/shubhamksawant/lab2.git
+    targetRevision: main
+    path: k8s/helm-chart
+    helm:
+      valueFiles:
+      - values.yaml
+      - values-canary.yaml
+      # Enable specific overrides based on environment
+      # - values-canary-dev.yaml  # For dev canary
+      # - values-canary-prod.yaml # For prod canary
+
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: humor-game-canary
+
+  # Sync policy for canary deployments
+  syncPolicy:
+    automated:
+      prune: false          # Careful with pruning in canary - keep stable version
+      selfHeal: true
+    syncOptions:
+    - CreateNamespace=true
+    - ApplyOutOfSyncOnly=true
+    - PrunePropagationPolicy=foreground
+    - Prune=false
+    # Retry on failure
+    retry:
+      limit: 5
+      backoff:
+        duration: 5s
+        factor: 2
+        maxDuration: 3m
+
+  # Critical for avoiding false positive out-of-sync with Rollouts
+  ignoreDifferences:
+  - group: argoproj.io
+    kind: Rollout
+    jsonPointers:
+    - /spec/template/metadata/annotations/deployment.kubernetes.io~1revision
+    - /status
+    - /spec/strategy/canary/stableRevision
+  - group: apps
+    kind: Deployment
+    jsonPointers:
+    - /spec/template/metadata/annotations/deployment.kubernetes.io~1revision
+  - group: ''
+    kind: Service
+    jsonPointers:
+    - /spec/clusterIP
+    - /spec/clusterIPs
+  - group: argoproj.io
+    kind: AnalysisRun
+    jsonPointers:
+    - /status
+
+  revisionHistoryLimit: 10
