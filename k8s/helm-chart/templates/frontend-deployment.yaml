@@ -29,13 +29,13 @@ spec:
         fsGroup: 101
       containers:
         - name: {{ .Values.frontend.name }}
-          # securityContext:
-          #   runAsNonRoot: true
-          #   runAsUser: 1000
-          #   readOnlyRootFilesystem: true
-          #   allowPrivilegeEscalation: false
-            # capabilities:
-            #   drop: ["ALL"]
+          securityContext:
+            runAsNonRoot: true
+            runAsUser: 1000
+            readOnlyRootFilesystem: true
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop: ["ALL"]
           image: "{{ .Values.frontend.image.repository }}:{{ .Values.frontend.image.tag }}"
           imagePullPolicy: {{ .Values.frontend.imagePullPolicy }}
           ports:
