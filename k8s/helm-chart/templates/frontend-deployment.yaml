@@ -51,6 +51,13 @@ spec:
                 configMapKeyRef:
                   name: {{ .Values.configmap.name }}
                   key: NODE_ENV
+          volumeMounts: # ADD THIS
+            - name: nginx-cache
+              mountPath: /var/cache/nginx
+            - name: nginx-run
+              mountPath: /var/run
+            - name: tmp
+              mountPath: /tmp
           resources: {{ toYaml .Values.frontend.resources | nindent 12 }}
           {{- if .Values.frontend.livenessProbe.enabled }}
           livenessProbe:
@@ -66,4 +73,11 @@ spec:
               path: {{ .Values.frontend.readinessProbe.path }}
               port: {{ .Values.frontend.port }}
           {{- end }}
+      volumes: # ADD THIS (at the same level as containers)
+        - name: nginx-cache
+          emptyDir: {}
+        - name: nginx-run
+          emptyDir: {}
+        - name: tmp
+          emptyDir: {}
 {{- end }}
