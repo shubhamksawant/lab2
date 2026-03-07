@@ -74,7 +74,13 @@ spec:
         accessModes: [ "ReadWriteOnce" ]
         resources:
           requests:
-            storage: {{ default "1Gi" (hasKey .Values.redis "persistence" | ternary (hasKey .Values.redis.persistence "size" | ternary .Values.redis.persistence.size "1Gi") "1Gi") }}
+            {{- $redisStorageSize := "1Gi" }}
+            {{- if hasKey .Values.redis "persistence" }}
+              {{- if hasKey .Values.redis.persistence "size" }}
+                {{- $redisStorageSize = .Values.redis.persistence.size }}
+              {{- end }}
+            {{- end }}
+            storage: {{ $redisStorageSize }}
         {{- if .Values.pvc.storageClassName }}
         storageClassName: {{ .Values.pvc.storageClassName }}
         {{- end }}
