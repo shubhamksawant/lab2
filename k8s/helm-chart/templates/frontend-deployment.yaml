@@ -75,9 +75,13 @@ spec:
           {{- end }}
       volumes: # ADD THIS (at the same level as containers)
         - name: nginx-cache
-          emptyDir: {}
+          emptyDir:
+            sizeLimit: 128Mi  # <--- Limits disk usage
         - name: nginx-run
-          emptyDir: {}
+          emptyDir:
+            sizeLimit: 10Mi   # PID files are tiny
         - name: tmp
-          emptyDir: {}
+          emptyDir:
+            sizeLimit: 64Mi
+
 {{- end }}
