@@ -3,6 +3,9 @@
 
 namespace: humor-game-dev
 
+networkPolicy:
+  enabled: true
+
 backend:
   image:
     tag: latest
@@ -10,6 +13,12 @@ backend:
   imagePullPolicy: IfNotPresent
   replicaCount: 1
   port: 3001
+  startupProbe:
+    enabled: true
+    path: /health
+    initialDelaySeconds: 5
+    periodSeconds: 5
+    failureThreshold: 30
 
 frontend:
   image:
@@ -18,6 +27,14 @@ frontend:
   imagePullPolicy: IfNotPresent
   replicaCount: 1
   port: 80
+  livenessProbe:
+    enabled: true
+    path: /
+    initialDelaySeconds: 15
+    periodSeconds: 10
+  readinessProbe:
+    enabled: true
+    path: /
 
 postgres:
   image:
@@ -26,11 +43,27 @@ postgres:
   persistence:
     enabled: true
     size: 1Gi
+  livenessProbe:
+    enabled: true
+    initialDelaySeconds: 30
+    periodSeconds: 10
+  readinessProbe:
+    enabled: true
+    initialDelaySeconds: 5
+    periodSeconds: 10
 
 redis:
   image:
     tag: 7-alpine
     repository: redis
+  livenessProbe:
+    enabled: true
+    initialDelaySeconds: 15
+    periodSeconds: 10
+  readinessProbe:
+    enabled: true
+    initialDelaySeconds: 5
+    periodSeconds: 10
 
 configmap:
   data:
