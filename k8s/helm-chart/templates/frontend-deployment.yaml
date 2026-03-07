@@ -22,6 +22,11 @@ spec:
 {{ toYaml .Values.frontend.annotations | indent 8 }}
         {{- end }}
     spec:
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 101     # Default UID for 'nginx' user in alpine images
+        runAsGroup: 101
+        fsGroup: 101
       containers:
         - name: {{ .Values.frontend.name }}
           # securityContext:
