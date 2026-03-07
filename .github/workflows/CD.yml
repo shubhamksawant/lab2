@@ -1,0 +1,93 @@
+name: 🚀 GitOps CD - Dynamic Tunnel Sync
+
+on:
+  push:
+    branches: [main, develop, qa, feature/**]
+    paths:
+      - 'k8s/helm-chart/**'
+      - 'k8s/monitoring/**'
+
+jobs:
+  ###################################################
+  # JOB 1: REFRESH & NOTIFY (Always Runs)
+  ###################################################
+  refresh-argocd:
+    name: 🔄 Refresh & Request Approval
+    runs-on: ubuntu-latest
+    steps:
+      - name: 🔐 Setup Dynamic Kubeconfig
+        run: |
+          mkdir -p ~/.kube
+          echo "${{ secrets.KUBECONFIG_STATIC }}" | base64 -d > ~/.kube/config
+          sed -i "s|server:.*|server: https://${{ secrets.NGROK_URL }}|g" ~/.kube/config
+          sed -i "/certificate-authority-data:.*/d" ~/.kube/config
+          sed -i "/cluster:/a \    insecure-skip-tls-verify: true" ~/.kube/config
+          chmod 600 ~/.kube/config
+
+      - name: 🔄 Trigger ArgoCD Hard Refresh
+        run: |
+          echo "Force-refreshing humor-game-monitor..."
+          kubectl annotate application humor-game-monitor -n argocd \
+            argocd.argoproj.io/refresh=hard --overwrite
+
+      - name: 📢 Slack - Requesting Approval
+        # MOVED HERE: This now sends immediately after the refresh
+        uses: 8398a7/action-slack@v3
+        with:
+          status: custom
+          fields: workflow,repo
+          custom_payload: |
+            {
+              "attachments": [{
+                "color": "#ebba34",
+                "title": "🛑 Deployment Approval Required",
+                "text": "ArgoCD refreshed for *${{ github.ref_name }}*.\nTunnel: `${{ secrets.NGROK_URL }}`\n\nPlease approve the sync in GitHub to proceed.",
+                "actions": [{
+                  "type": "button",
+                  "text": "Review & Approve in GitHub",
+                  "url": "${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+                }]
+              }]
+            }
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+
+  ###################################################
+  # JOB 2: SYNC (Waits for Manual Approval)
+  ###################################################
+  deploy-sync:
+    name: 🚀 Approval & Sync
+    needs: refresh-argocd
+    runs-on: ubuntu-latest
+    # This ENVIRONMENT must have protection rules in GitHub Settings
+    environment: ${{ (github.ref_name == 'main' && 'production') || (github.ref_name == 'qa' && 'qa') || 'development' }}
+    
+    steps:
+      - name: 🔐 Setup Dynamic Kubeconfig
+        run: |
+          mkdir -p ~/.kube
+          echo "${{ secrets.KUBECONFIG_STATIC }}" | base64 -d > ~/.kube/config
+          sed -i "s|server:.*|server: https://${{ secrets.NGROK_URL }}|g" ~/.kube/config
+          sed -i "/certificate-authority-data:.*/d" ~/.kube/config
+          sed -i "/cluster:/a \    insecure-skip-tls-verify: true" ~/.kube/config
+          chmod 600 ~/.kube/config
+
+      - name: 🚀 Trigger Sync (Native Kubectl Patch)
+        run: |
+          echo "Deployment approved! Initiating sync on local k3d..."
+          kubectl patch application humor-game-monitor -n argocd \
+            --type='merge' \
+            -p='{"operation":{"sync":{}}}'
+
+      - name: ⏳ Wait for Sync
+        run: |
+          kubectl wait --for=jsonpath='{.status.sync.status}'=Synced application/humor-game-monitor -n argocd --timeout=120s
+
+      - name: 📢 Slack - Success
+        if: success()
+        uses: 8398a7/action-slack@v3
+        with:
+          status: success
+          text: "✅ *Sync Successful!* The changes are now live on your local system."
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
