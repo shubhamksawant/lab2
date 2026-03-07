@@ -7,7 +7,7 @@ spec:
   project: humor-game-project
   source:
     repoURL: https://github.com/shubhamksawant/lab2.git
-    targetRevision: main # develop for dev, qa for qa
+    targetRevision: feature/advance-k8s # develop for dev, qa for qa
     path: k8s/helm-chart
     helm:
       valueFiles:
