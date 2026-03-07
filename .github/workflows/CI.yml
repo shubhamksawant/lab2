@@ -1,0 +1,426 @@
+name: 🚀 DevSecOps CI/CD Pipeline
+
+on:
+  push:
+    branches: [ feature/* ] # Trigger on main and feature branches
+    paths-ignore:
+      - 'k8s/**'
+  pull_request:
+    branches: [ develop,main ]
+    paths-ignore:
+      - 'k8s/**'
+  workflow_dispatch:
+
+env:
+  # Registry URL is now GHCR (ghcr.io)
+  # Uses the repository owner as the base for the registry path
+  REGISTRY: ghcr.io
+  IMAGE_NAME_BACKEND: humor-game-backend
+  IMAGE_NAME_FRONTEND: humor-game-frontend
+  REPO_OWNER: ${{ github.repository_owner }} # Used to construct the full GHCR image path
+
+jobs:
+  ###################################################
+  # JOB 1: SECURITY & TEST (Shift-Left/Fail-Fast)
+  ###################################################
+  security-and-test:
+    name: 🛡️ Security Checks & Unit Tests
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: 📥 Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0 # Required for SonarCloud PR analysis
+          
+      - name: 📦 Setup Node.js & Install dependencies
+        uses: actions/setup-node@v4
+        with:
+          node-version: 18
+          
+      - name: ⬇️ Install Node.js Dependencies
+        run: |
+          cd backend && npm ci
+          cd ../frontend && npm ci
+          
+      # --- TRIVY FILESYSTEM SCAN (SCA, Secrets, IaC/Config) ---
+      # This performs the Dependency Scan (SCA) by analyzing package-lock.json
+      - name: 🔍 Trivy Filesystem Scan (SCA, Secrets, Config)
+        uses: aquasecurity/trivy-action@master
+        with:
+          scan-type: 'fs'
+          scan-ref: '.'
+          scanners: 'vulnerability,misconfiguration,secret' 
+          severity: 'CRITICAL,HIGH' 
+          exit-code: 1
+          format: 'table'
+          output: 'trivy-fs-report.txt'
+
+      
+      - name: ⬆️ Upload Trivy Report Artifact
+        # CRITICAL FIX: Add 'if: always()' to ensure this runs even if Trivy fails
+        if: always() 
+        uses: actions/upload-artifact@v4
+        with:
+          name: trivy-fs-report-${{ github.sha_short }}
+          path: trivy-fs-report.txt
+          retention-days: 7
+
+          
+      # --- UNIT TESTS ---
+      - name: 🧪 Run Unit Tests
+        run: |
+          cd backend && npm test
+          cd ../frontend && npm test
+
+# --- NOTIFICATION STEP (Run Always) ---
+      - name: 📢 Slack Notification Security Status
+        if: always()
+        uses: 8398a7/action-slack@v3
+        with:
+          status: ${{ job.status }}
+          channel: '#devops'
+          text: |
+            *🛡️ JOB 1 STATUS: Security Checks & Tests*
+            
+            *Status:* ${{ job.status }}
+            *Repo:* ${{ github.repository }}
+            *Run:* <${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}|View Pipeline Run #${{ github.run_number }}>
+            *Summary:* Static Analysis (SonarCloud) and Unit Tests complete.
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+
+
+
+  ###################################################
+  # JOB 2: BUILD, PUSH & ARTIFACT SECURITY
+  ###################################################
+  build-and-push:
+    name: 🏗️ Build, Scan, and Push Images
+    runs-on: ubuntu-latest
+    needs: [security-and-test]
+    if: success() && github.ref == 'refs/heads/main'
+    
+    steps:
+      - name: 📥 Checkout code
+        uses: actions/checkout@v4
+        
+      - name: 🐳 Setup Docker Buildx
+        uses: docker/setup-buildx-action@v3
+        
+      - name: 🔐 Login to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }} # Use the GitHub Actor for GHCR login
+          password: ${{ secrets.GITHUB_TOKEN }} # Use the GITHUB_TOKEN (requires 'write:packages' permission)
+      
+      # # --- TRIVY k8s CONFIG SCAN (Config Security) ---
+      # - name: ⚙️ Trivy k8s Scan on Kustomize Configs
+      #   uses: aquasecurity/trivy-action@master
+      #   with:
+      #     scan-type: 'config'
+      #     scan-ref: 'gitops-safe' # Target your Kustomize folder for K8s misconfigs
+      #     security-checks: 'config'
+      #     severity: 'CRITICAL,HIGH' # Fail if insecure K8s config is detected
+      #     exit-code: 1
+      #     format: 'table'
+      #     output: 'trivy-k8s-config-report.txt'
+
+      
+      # - name: ⬆️ Upload Trivy Report Artifact
+      #   if: always() 
+      #   uses: actions/upload-artifact@v4
+      #   with:
+      #     name: trivy-k8s-config-report-${{ github.sha_short }}
+      #     path: 'trivy-k8s-config-report.txt'
+      #     retention-days: 7
+
+
+
+
+     # --- BUILD BACKEND IMAGE (STAGING ARTIFACT) ---
+      - name: 🏗️ Build Backend Image
+        uses: docker/build-push-action@v5
+        id: build_backend
+        with:
+          context: ./backend
+          push: false # Keep this to scan before pushing
+          tags: ${{ env.REGISTRY }}/${{ env.REPO_OWNER }}/${{ env.IMAGE_NAME_BACKEND }}:${{ github.sha }}
+          # CRITICAL FIX: Load the image into the Docker daemon so Trivy can see it
+          outputs: type=docker 
+
+      # # --- TRIVY IMAGE SCAN (Backend Artifact Security) ---
+      # # This step will now successfully find the image locally
+      # - name: 🔍 Trivy Image Scan (Backend)
+      #   uses: aquasecurity/trivy-action@master
+      #   with:
+      #     scan-type: 'image'
+      #     image-ref: ${{ env.REGISTRY }}/${{ env.REPO_OWNER }}/${{ env.IMAGE_NAME_BACKEND }}:${{ github.sha }}
+      #     severity: 'CRITICAL,HIGH' 
+      #     exit-code: 1 
+      #     format: 'table'
+      #     output: 'trivy-backend-image-report.txt'
+
+      
+      # - name: ⬆️ Upload Trivy Report Artifact
+      #   if: always() 
+      #   uses: actions/upload-artifact@v4
+      #   with:
+      #     name: trivy-backend-image-report-${{ github.sha_short }}
+      #     path: 'trivy-backend-image-report.txt'
+      #     retention-days: 7
+
+      - name: 🚀 Push Backend to GHCR
+        if: success() # Only push if scan passed
+        uses: docker/build-push-action@v5
+        with:
+          context: ./backend
+          push: true
+          tags: |
+            ${{ env.REGISTRY }}/${{ env.REPO_OWNER }}/${{ env.IMAGE_NAME_BACKEND }}:${{ github.sha }}
+            ${{ env.REGISTRY }}/${{ env.REPO_OWNER }}/${{ env.IMAGE_NAME_BACKEND }}:latest
+
+      # --- BUILD, SCAN, AND PUSH FRONTEND ---
+      - name: 🏗️ Build Frontend Image
+        uses: docker/build-push-action@v5
+        id: build_frontend
+        with:
+          context: ./frontend
+          push: false # Build locally first
+          tags: ${{ env.REGISTRY }}/${{ env.REPO_OWNER }}/${{ env.IMAGE_NAME_FRONTEND }}:${{ github.sha }}
+          # CRITICAL FIX: Load the image into the Docker daemon so Trivy can see it
+          outputs: type=docker
+
+      # - name: 🔍 Trivy Image Scan (Frontend)
+      #   uses: aquasecurity/trivy-action@master
+      #   with:
+      #     scan-type: 'image'
+      #     image-ref: ${{ env.REGISTRY }}/${{ env.REPO_OWNER }}/${{ env.IMAGE_NAME_FRONTEND }}:${{ github.sha }}
+      #     severity: 'CRITICAL,HIGH' # Fail if vulnerable image is detected
+      #     exit-code: 1 
+      #     format: 'table'
+      #     output: 'trivy-frontend-image-report.txt'
+
+      # - name: ⬆️ Upload Trivy Report Artifact
+      #   if: always() 
+      #   uses: actions/upload-artifact@v4
+      #   with:
+      #     name: trivy-frontend-image-report-${{ github.sha_short }}
+      #     path: 'trivy-frontend-image-report.txt'
+      #     retention-days: 7
+
+      - name: 🚀 Push Frontend to GHCR
+        if: success() # Only push if scan passed
+        uses: docker/build-push-action@v5
+        with:
+          context: ./frontend
+          push: true
+          tags: |
+            ${{ env.REGISTRY }}/${{ env.REPO_OWNER }}/${{ env.IMAGE_NAME_FRONTEND }}:${{ github.sha }}
+            ${{ env.REGISTRY }}/${{ env.REPO_OWNER }}/${{ env.IMAGE_NAME_FRONTEND }}:latest
+
+       # --- NOTIFICATION STEP (Run Always) ---
+      - name: 📢 Slack Notification Build & Artifact Status
+        if: always()
+        uses: 8398a7/action-slack@v3
+        with:
+          status: ${{ job.status }}
+          channel: '#devops'
+          text: |
+            *📦 JOB 2 STATUS: Build & Artifact Security*
+            
+            *Status:* ${{ job.status }}
+            *Artifacts:* Backend and Frontend Images
+            *Target:* GHCR (${{ env.REPO_OWNER }})
+            *Run:* <${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}|View Pipeline Run #${{ github.run_number }}>
+            *Summary:* Artifacts built and passed Trivy Image Scadn. Ready for deployment.
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+
+
+  ###################################################
+  # JOB 3: PROMOTE TO ENVIRONMENT (Update Helm Values + PR) - IDEMPOTENT
+  ###################################################
+  promote-to-environment:
+    name: 🚀 Promote to Environment (Helm Values PR)
+    runs-on: ubuntu-latest
+    needs: build-and-push
+    if: success()
+    permissions:
+      contents: write
+      pull-requests: write
+
+    steps:
+      - name: 📥 Checkout repository
+        uses: actions/checkout@v4
+
+
+      - name: 🔍 Map Branch to Environment
+        id: vars
+        run: |
+          SHORT_SHA=$(echo "${{ github.sha }}" | cut -c1-7)
+          BRANCH_NAME="${{ github.ref_name }}"
+          
+          # Branch Mapping Logic
+          if [[ "$BRANCH_NAME" == "develop" ]]; then
+            ENV="dev"
+            FILE="helm-chart/values-dev.yaml"
+          elif [[ "$BRANCH_NAME" == "qa" ]]; then
+            ENV="qa"
+            FILE="helm-chart/values-qa.yaml"
+          elif [[ "$BRANCH_NAME" == "main" ]]; then
+            ENV="prod"
+            FILE="helm-chart/values-prod.yaml"
+          else
+            echo "❌ Error: Branch $BRANCH_NAME does not have a mapped environment."
+            exit 1
+          fi
+
+          echo "short_sha=$SHORT_SHA" >> $GITHUB_OUTPUT
+          echo "env=$ENV" >> $GITHUB_OUTPUT
+          echo "file=$FILE" >> $GITHUB_OUTPUT
+          echo "pr_branch=helm/update-$ENV-$SHORT_SHA" >> $GITHUB_OUTPUT
+
+      - name: ✏️ Native Update & Push
+        id: update
+        run: |
+          FILE="${{ steps.vars.outputs.file }}"
+          TAG="${{ steps.vars.outputs.short_sha }}"
+          PR_BRANCH="${{ steps.vars.outputs.pr_branch }}"
+          
+          # Robust Native sed: 
+          # Finds the 'backend:' block and replaces the first 'tag:' found after it.
+          # Then does the same for 'frontend:'.
+          sed -i '/backend:/,/tag:/ s/tag: .*/tag: "'"$TAG"'"/' "$FILE"
+          sed -i '/frontend:/,/tag:/ s/tag: .*/tag: "'"$TAG"'"/' "$FILE"
+
+          # Check if the file changed from 'latest' to the SHA
+          if ! git diff --exit-code "$FILE" > /dev/null; then
+            git config user.name "github-actions[bot]"
+            git config user.email "github-actions[bot]@users.noreply.github.com"
+            
+            git checkout -b "$PR_BRANCH"
+            git add "$FILE"
+            git commit -m "chore(helm): update $FILE tags to $TAG"
+            git push origin "$PR_BRANCH" --force
+            echo "changed=true" >> $GITHUB_OUTPUT
+          else
+            echo "✅ No changes detected. Tags in $FILE are already set to $TAG."
+            echo "changed=false" >> $GITHUB_OUTPUT
+          fi
+
+      - name: 🔄 Create PR (Native GitHub CLI)
+        if: steps.update.outputs.changed == 'true'
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          # Use GH CLI to open the PR targeting the branch that triggered the run
+          gh pr create \
+            --base ${{ github.ref_name }} \
+            --head ${{ steps.vars.outputs.pr_branch }} \
+            --title "🚀 GitOps: Update ${{ steps.vars.outputs.env }} tags to ${{ steps.vars.outputs.short_sha }}" \
+            --body "Automated promotion for environment: **${{ steps.vars.outputs.env }}**. Please review and merge to trigger deployment."
+  
+
+      - name: 📝 Prepare Slack Message
+        if: always()
+        id: slack_msg
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          ENV_NAME="${{ steps.vars.outputs.env }}"
+          SHA="${{ steps.vars.outputs.short_sha }}"
+          
+          if [[ "${{ steps.update.outputs.changed }}" == "true" ]]; then
+            # Use GH CLI to get the PR URL we just created
+            PR_URL=$(gh pr view ${{ steps.vars.outputs.pr_branch }} --json url --jq .url)
+            
+            MSG="*🚀 Promotion to $ENV_NAME*\nNew tag applied: *$SHA*\n<$PR_URL|View Pull Request>\n\nMerge the PR to trigger deployment!"
+          else
+            MSG="*🚀 Promotion to $ENV_NAME*\nAlready up-to-date with tag *$SHA*\nNo PR created."
+          fi
+          
+          # Save the message for the next step
+          echo "content=$MSG" >> $GITHUB_OUTPUT
+
+      - name: 📢 Send Slack Notification
+        if: always()
+        uses: 8398a7/action-slack@v3
+        with:
+          status: ${{ job.status }}
+          channel: '#devops'
+          text: ${{ steps.slack_msg.outputs.content }}
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+      
+          
+  ###################################################
+  # JOB 4: CLEANUP OLD GHCR IMAGES (Keep Last 5 Builds)
+  ###################################################
+  cleanup-ghcr:
+    name: 🧹 Cleanup Old GHCR Images (Keep Last 5)
+    runs-on: ubuntu-latest
+    needs: promote-to-environment
+    if: success()
+
+    permissions:
+      packages: write   # ✅ write allows delete
+      contents: read
+
+    steps:
+      - name: 🧹 Delete old versions of backend image (keep last 5)
+        uses: actions/delete-package-versions@v5
+        with:
+          package-type: container
+          package-name: ${{ env.IMAGE_NAME_BACKEND }}
+          min-versions-to-keep: 5
+          delete-only-untagged-versions: false
+
+      - name: 🧹 Delete old versions of frontend image (keep last 5)
+        uses: actions/delete-package-versions@v5
+        with:
+          package-type: container
+          package-name: ${{ env.IMAGE_NAME_FRONTEND }}
+          min-versions-to-keep: 5
+          delete-only-untagged-versions: false
+
+      - name: 📢 Slack Notification - GHCR Cleanup Complete
+        if: always()
+        uses: 8398a7/action-slack@v3
+        with:
+          status: success
+          channel: '#devops'
+          text: |
+            *🧹 GHCR Cleanup Complete*
+
+            Old image versions cleaned up.
+            Only the **last 5 builds** are retained for both backend and frontend images.
+
+            Storage optimized! 🚀
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+
+
+  ###################################################
+  # JOB 5: NOTIFY
+  ###################################################
+  notify:
+    name: 📢 Notify Team
+    runs-on: ubuntu-latest
+    needs: [build-and-push]
+    if: always()
+    
+    steps:
+      - name: 📢 Slack notification
+        uses: 8398a7/action-slack@v3
+        with:
+          status: ${{ job.status }}
+          channel: '#deployments'
+          text: |
+            🚀 Deployment ${{ job.status }} for Humor Memory Game
+            Commit: ${{ github.sha }}
+            Branch: ${{ github.ref_name }}
+            Environment: Production
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}

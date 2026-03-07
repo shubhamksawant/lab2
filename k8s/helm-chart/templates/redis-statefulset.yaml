@@ -1,0 +1,88 @@
+{{- if .Values.redis.enabled }}
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: {{ .Values.redis.name }}
+  namespace: {{ .Values.namespace | quote }}
+  labels:
+    app: {{ .Values.redis.name }}
+spec:
+  serviceName: {{ .Values.redis.serviceName | default .Values.redis.name }}
+  replicas: 1
+  selector:
+    matchLabels:
+      app: {{ .Values.redis.name }}
+  template:
+    metadata:
+      labels:
+        app: {{ .Values.redis.name }}
+      annotations:
+        checksum/config: {{ include (print $.Template.BasePath "/configmap.yaml") . | sha256sum }}
+        checksum/secrets: {{ include (print $.Template.BasePath "/secrets.yaml") . | sha256sum }}
+    spec:
+      containers:
+        - name: {{ .Values.redis.name }}
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop: ["ALL"]
+          image: "{{ .Values.redis.image.repository }}:{{ .Values.redis.image.tag }}"
+          imagePullPolicy: {{ .Values.redis.imagePullPolicy }}
+          command: ["sh", "-c", "exec redis-server --appendonly yes --requirepass \"$REDIS_PASSWORD\""]
+          env:
+            - name: REDIS_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.secrets.name }}
+                  key: REDIS_PASSWORD
+          ports:
+            - containerPort: {{ .Values.redis.port }}
+          resources: {{ toYaml .Values.redis.resources | nindent 12 }}
+          {{- if .Values.redis.livenessProbe.enabled }}
+          livenessProbe:
+            exec:
+              command: ["sh", "-c", "redis-cli -a $REDIS_PASSWORD ping"]
+            initialDelaySeconds: {{ .Values.redis.livenessProbe.initialDelaySeconds }}
+            periodSeconds: {{ .Values.redis.livenessProbe.periodSeconds }}
+          {{- end }}
+          {{- if .Values.redis.readinessProbe.enabled }}
+          readinessProbe:
+            exec:
+              command: ["sh", "-c", "redis-cli -a $REDIS_PASSWORD ping"]
+            initialDelaySeconds: {{ .Values.redis.readinessProbe.initialDelaySeconds }}
+            periodSeconds: {{ .Values.redis.readinessProbe.periodSeconds }}
+          {{- end }}
+          volumeMounts:
+            - name: redis-storage
+              mountPath: /data
+      volumes:
+        {{- $redisPersistenceEnabled := true }}
+        {{- if hasKey .Values.redis "persistence" }}
+          {{- if hasKey .Values.redis.persistence "enabled" }}
+            {{- $redisPersistenceEnabled = .Values.redis.persistence.enabled }}
+          {{- end }}
+        {{- end }}
+        {{- if not $redisPersistenceEnabled }}
+        - name: redis-storage
+          emptyDir: {}
+        {{- end }}
+  {{- if $redisPersistenceEnabled }}
+  volumeClaimTemplates:
+    - metadata:
+        name: redis-storage
+      spec:
+        accessModes: [ "ReadWriteOnce" ]
+        resources:
+          requests:
+            {{- $redisStorageSize := "1Gi" }}
+            {{- if hasKey .Values.redis "persistence" }}
+              {{- if hasKey .Values.redis.persistence "size" }}
+                {{- $redisStorageSize = .Values.redis.persistence.size }}
+              {{- end }}
+            {{- end }}
+            storage: {{ $redisStorageSize }}
+        {{- if .Values.pvc.storageClassName }}
+        storageClassName: {{ .Values.pvc.storageClassName }}
+        {{- end }}
+  {{- end }}
+{{- end }}

@@ -15,13 +15,27 @@ spec:
     metadata:
       labels:
         app: {{ .Values.frontend.name }}
-      {{- if .Values.frontend.annotations }}
       annotations:
+        checksum/config: {{ include (print $.Template.BasePath "/configmap.yaml") . | sha256sum }}
+        checksum/secrets: {{ include (print $.Template.BasePath "/secrets.yaml") . | sha256sum }}
+        {{- if .Values.frontend.annotations }}
 {{ toYaml .Values.frontend.annotations | indent 8 }}
-      {{- end }}
+        {{- end }}
     spec:
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 101     # Default UID for 'nginx' user in alpine images
+        runAsGroup: 101
+        fsGroup: 101
       containers:
         - name: {{ .Values.frontend.name }}
+          securityContext:
+            runAsNonRoot: true
+            runAsUser: 1000
+            readOnlyRootFilesystem: true
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop: ["ALL"]
           image: "{{ .Values.frontend.image.repository }}:{{ .Values.frontend.image.tag }}"
           imagePullPolicy: {{ .Values.frontend.imagePullPolicy }}
           ports:
@@ -37,5 +51,37 @@ spec:
                 configMapKeyRef:
                   name: {{ .Values.configmap.name }}
                   key: NODE_ENV
+          volumeMounts: # ADD THIS
+            - name: nginx-cache
+              mountPath: /var/cache/nginx
+            - name: nginx-run
+              mountPath: /var/run
+            - name: tmp
+              mountPath: /tmp
           resources: {{ toYaml .Values.frontend.resources | nindent 12 }}
+          {{- if .Values.frontend.livenessProbe.enabled }}
+          livenessProbe:
+            httpGet:
+              path: {{ .Values.frontend.livenessProbe.path }}
+              port: {{ .Values.frontend.port }}
+            initialDelaySeconds: {{ .Values.frontend.livenessProbe.initialDelaySeconds }}
+            periodSeconds: {{ .Values.frontend.livenessProbe.periodSeconds }}
+          {{- end }}
+          {{- if .Values.frontend.readinessProbe.enabled }}
+          readinessProbe:
+            httpGet:
+              path: {{ .Values.frontend.readinessProbe.path }}
+              port: {{ .Values.frontend.port }}
+          {{- end }}
+      volumes: # ADD THIS (at the same level as containers)
+        - name: nginx-cache
+          emptyDir:
+            sizeLimit: 128Mi  # <--- Limits disk usage
+        - name: nginx-run
+          emptyDir:
+            sizeLimit: 10Mi   # PID files are tiny
+        - name: tmp
+          emptyDir:
+            sizeLimit: 64Mi
+
 {{- end }}

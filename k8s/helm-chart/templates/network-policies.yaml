@@ -1,0 +1,97 @@
+{{- if .Values.networkPolicy.enabled }}
+---
+# Default Deny-All Ingress Policy
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: default-deny-ingress
+  namespace: {{ .Values.namespace | quote }}
+spec:
+  podSelector: {}
+  policyTypes:
+  - Ingress
+
+---
+# Allow Frontend Traffic (e.g., from Ingress Controller or external)
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: {{ .Values.frontend.name }}-allow-ingress
+  namespace: {{ .Values.namespace | quote }}
+spec:
+  podSelector:
+    matchLabels:
+      app: {{ .Values.frontend.name }}
+  policyTypes:
+  - Ingress
+  ingress:
+  - ports:
+    - protocol: TCP
+      port: {{ .Values.frontend.port }}
+
+---
+# Allow Frontend to communicate with Backend
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: {{ .Values.backend.name }}-allow-frontend
+  namespace: {{ .Values.namespace | quote }}
+spec:
+  podSelector:
+    matchLabels:
+      app: {{ .Values.backend.name }}
+  policyTypes:
+  - Ingress
+  ingress:
+  - from:
+    - podSelector:
+        matchLabels:
+          app: {{ .Values.frontend.name }}
+    ports:
+    - protocol: TCP
+      port: {{ .Values.backend.port }}
+
+---
+# Allow Backend to communicate with Postgres
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: {{ .Values.postgres.name }}-allow-backend
+  namespace: {{ .Values.namespace | quote }}
+spec:
+  podSelector:
+    matchLabels:
+      app: {{ .Values.postgres.name }}
+  policyTypes:
+  - Ingress
+  ingress:
+  - from:
+    - podSelector:
+        matchLabels:
+          app: {{ .Values.backend.name }}
+    ports:
+    - protocol: TCP
+      port: {{ .Values.postgres.port }}
+
+---
+# Allow Backend to communicate with Redis
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: {{ .Values.redis.name }}-allow-backend
+  namespace: {{ .Values.namespace | quote }}
+spec:
+  podSelector:
+    matchLabels:
+      app: {{ .Values.redis.name }}
+  policyTypes:
+  - Ingress
+  ingress:
+  - from:
+    - podSelector:
+        matchLabels:
+          app: {{ .Values.backend.name }}
+    ports:
+    - protocol: TCP
+      port: {{ .Values.redis.port }}
+{{- end }}
