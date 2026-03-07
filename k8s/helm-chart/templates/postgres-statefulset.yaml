@@ -26,10 +26,11 @@ spec:
         runAsGroup: 999
       containers:
         - name: {{ .Values.postgres.name }}
-          # securityContext:
-          #   allowPrivilegeEscalation: false
-          #   capabilities:
-          #     drop: ["ALL"]
+          securityContext:
+            allowPrivilegeEscalation: false
+            runAsNonRoot: true
+            capabilities:
+              drop: ["ALL"]
           image: "{{ .Values.postgres.image.repository }}:{{ .Values.postgres.image.tag }}"
           imagePullPolicy: {{ .Values.postgres.imagePullPolicy }}
           ports:
